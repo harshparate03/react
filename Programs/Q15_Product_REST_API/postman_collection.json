@@ -1,0 +1,32 @@
+{
+  "info": {
+    "name": "Product_REST_API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create record",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:3000/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"Example name\", \"price\": 49.99}"
+        }
+      }
+    },
+    {
+      "name": "GET products",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:3000/products"
+      }
+    }
+  ]
+}

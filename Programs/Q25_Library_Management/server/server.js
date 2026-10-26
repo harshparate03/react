@@ -1,0 +1,25 @@
+import express from 'express';
+const app=express();
+app.use(express.json({limit:'100kb'}));
+app.use((req,res,next)=>{if(['POST','PUT'].includes(req.method)&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)))return res.status(400).json({message:'Send a JSON object'});next();});
+const text=value=>typeof value==='string' && value.trim().length>0;
+const email=value=>text(value)&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
+import mongoose from 'mongoose';
+await mongoose.connect(process.env.MONGODB_URI||'mongodb://127.0.0.1:27017/library_management');
+const schema=new mongoose.Schema({bookId:{type:String,required:true,trim:true,unique:true},bookName:{type:String,required:true,trim:true},authorName:{type:String,required:true,trim:true},publication:{type:String,required:true,trim:true},available:{type:String,required:true,enum:['Available','Issued']}},{timestamps:true});
+const Model=mongoose.model('Book',schema);
+const allowed=["bookId", "bookName", "authorName", "publication", "available"];
+const pick=body=>Object.fromEntries(allowed.filter(key=>Object.hasOwn(body,key)).map(key=>[key,body[key]]));
+app.post('/api/books',wrap(async(req,res)=>res.status(201).json(await Model.create(pick(req.body)))));
+app.get('/api/books',wrap(async(req,res)=>res.json(await Model.find().sort({createdAt:-1}))));
+app.put('/api/books/:id',wrap(async(req,res)=>{const record=await Model.findByIdAndUpdate(req.params.id,pick(req.body),{new:true,runValidators:true});if(!record)return res.status(404).json({message:'Record not found'});res.json(record);}));
+app.delete('/api/books/:id',wrap(async(req,res)=>{const record=await Model.findByIdAndDelete(req.params.id);if(!record)return res.status(404).json({message:'Record not found'});res.json({message:'Record deleted'});}));
+import {pathToFileURL} from 'node:url';
+app.use((req,res)=>res.status(404).json({message:'Endpoint not found'}));
+app.use((error,req,res,next)=>{
+ const status=error.type==='entity.parse.failed'?400:error.code===11000?409:['ValidationError','CastError'].includes(error.name)?400:500;
+ res.status(status).json({message:status===500?'Server operation failed. Check the database connection.':error.code===11000?'A record with this unique value already exists.':error.message});
+});
+export {app};
+if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) app.listen(process.env.PORT||3000,()=>console.log('API running on port '+(process.env.PORT||3000)));

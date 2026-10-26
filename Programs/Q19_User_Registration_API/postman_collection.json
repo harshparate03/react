@@ -1,0 +1,25 @@
+{
+  "info": {
+    "name": "User_Registration_API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create record",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:3000/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"Example name\", \"email\": \"asha@example.com\", \"password\": \"Example password\"}"
+        }
+      }
+    }
+  ]
+}

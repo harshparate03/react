@@ -1,0 +1,12 @@
+import React, {useState, useEffect} from 'react';
+import {createRoot} from 'react-dom/client';
+import './style.css';
+function App(){
+ const [products,setProducts]=useState([]),[cart,setCart]=useState([]),[summary,setSummary]=useState(null),[message,setMessage]=useState('');
+ useEffect(()=>{fetch('/api/products').then(async response=>{if(!response.ok)throw new Error('Unable to load products');setProducts(await response.json());}).catch(error=>setMessage(error.message));},[]);
+ function add(product){setSummary(null);setCart(previous=>previous.some(item=>item.id===product.id)?previous.map(item=>item.id===product.id?{...item,quantity:item.quantity+1}:item):[...previous,{...product,quantity:1}]);}
+ function change(id,delta){setSummary(null);setCart(previous=>previous.map(item=>item.id===id?{...item,quantity:item.quantity+delta}:item).filter(item=>item.quantity>0));}
+ async function finalize(){try{const response=await fetch('/api/cart/summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:cart.map(({id,quantity})=>({id,quantity}))})});const data=await response.json();if(!response.ok)throw new Error(data.message);setSummary(data);setMessage('Final summary calculated.');}catch(error){setMessage(error.message);}}
+ return <main><h1>Online Shopping Cart</h1><h2>Products</h2>{products.map(product=><article key={product.id}>{product.name} — Rs. {product.price.toFixed(2)} <button onClick={()=>add(product)}>Add to cart</button></article>)}<h2>Cart</h2>{cart.length===0&&<p>Your cart is empty.</p>}{cart.map(item=><article key={item.id}>{item.name} — {item.quantity} × Rs. {item.price.toFixed(2)}<button aria-label={'Decrease '+item.name} onClick={()=>change(item.id,-1)}>-</button><button aria-label={'Increase '+item.name} onClick={()=>change(item.id,1)}>+</button><button onClick={()=>{setCart(previous=>previous.filter(record=>record.id!==item.id));setSummary(null);}}>Remove</button></article>)}<h3>Total: Rs. {cart.reduce((sum,item)=>sum+item.quantity*item.price,0).toFixed(2)}</h3><button disabled={!cart.length} onClick={finalize}>Final cart summary</button>{message&&<p role="status">{message}</p>}{summary&&<section><h2>Final Summary</h2>{summary.items.map(item=><p key={item.id}>{item.name}: {item.quantity} × Rs. {item.price.toFixed(2)} = Rs. {item.subtotal.toFixed(2)}</p>)}<strong>Total: Rs. {summary.total.toFixed(2)}</strong></section>}</main>;
+}
+createRoot(document.getElementById('root')).render(<App/>);

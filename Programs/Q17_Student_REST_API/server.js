@@ -1,0 +1,23 @@
+import express from 'express';
+const app=express();
+app.use(express.json({limit:'100kb'}));
+app.use((req,res,next)=>{if(['POST','PUT'].includes(req.method)&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)))return res.status(400).json({message:'Send a JSON object'});next();});
+const text=value=>typeof value==='string' && value.trim().length>0;
+const email=value=>text(value)&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
+let records=[];
+let nextId=1;
+const valid=body=>text(body.name) && text(body.course) && text(body.city);
+app.get('/students',(req,res)=>res.json(records));
+app.post('/students',(req,res)=>{if(!valid(req.body))return res.status(400).json({message:'Provide valid required fields: name, course, city'});
+const record={id:nextId++,name:req.body.name,course:req.body.course,city:req.body.city};records.push(record);res.status(201).json(record);});
+app.put('/students/:id',(req,res)=>{const index=records.findIndex(item=>item.id===Number(req.params.id));if(index<0)return res.status(404).json({message:'Record not found'});if(!valid(req.body))return res.status(400).json({message:'All fields must be valid'});records[index]={id:records[index].id,name:req.body.name,course:req.body.course,city:req.body.city};res.json(records[index]);});
+app.delete('/students/:id',(req,res)=>{const index=records.findIndex(item=>item.id===Number(req.params.id));if(index<0)return res.status(404).json({message:'Record not found'});records.splice(index,1);res.json({message:'Record deleted'});});
+import {pathToFileURL} from 'node:url';
+app.use((req,res)=>res.status(404).json({message:'Endpoint not found'}));
+app.use((error,req,res,next)=>{
+ const status=error.type==='entity.parse.failed'?400:error.code===11000?409:['ValidationError','CastError'].includes(error.name)?400:500;
+ res.status(status).json({message:status===500?'Server operation failed. Check the database connection.':error.code===11000?'A record with this unique value already exists.':error.message});
+});
+export {app};
+if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) app.listen(process.env.PORT||3000,()=>console.log('API running on port '+(process.env.PORT||3000)));

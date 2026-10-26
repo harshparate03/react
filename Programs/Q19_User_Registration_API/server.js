@@ -1,0 +1,21 @@
+import express from 'express';
+const app=express();
+app.use(express.json({limit:'100kb'}));
+app.use((req,res,next)=>{if(['POST','PUT'].includes(req.method)&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)))return res.status(400).json({message:'Send a JSON object'});next();});
+const text=value=>typeof value==='string' && value.trim().length>0;
+const email=value=>text(value)&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
+let records=[];
+let nextId=1;
+const valid=body=>text(body.name) && email(body.email) && text(body.password);
+import {scryptSync,randomBytes} from 'node:crypto';
+app.post('/users',(req,res)=>{if(!valid(req.body))return res.status(400).json({message:'Provide valid required fields: name, email, password'});
+if(records.some(item=>item.email===req.body.email.trim().toLowerCase()))return res.status(409).json({message:'Email already registered'});const salt=randomBytes(16).toString('hex');const user={id:nextId++,name:req.body.name.trim(),email:req.body.email.trim().toLowerCase(),salt,passwordHash:scryptSync(req.body.password,salt,64).toString('hex')};records.push(user);return res.status(201).json({message:'Registration successful',user:{id:user.id,name:user.name,email:user.email}});});
+import {pathToFileURL} from 'node:url';
+app.use((req,res)=>res.status(404).json({message:'Endpoint not found'}));
+app.use((error,req,res,next)=>{
+ const status=error.type==='entity.parse.failed'?400:error.code===11000?409:['ValidationError','CastError'].includes(error.name)?400:500;
+ res.status(status).json({message:status===500?'Server operation failed. Check the database connection.':error.code===11000?'A record with this unique value already exists.':error.message});
+});
+export {app};
+if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) app.listen(process.env.PORT||3000,()=>console.log('API running on port '+(process.env.PORT||3000)));
